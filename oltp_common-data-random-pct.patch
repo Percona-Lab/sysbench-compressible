@@ -26,7 +26,7 @@
 +local pad_value_template_full = "###########-###########-###########-" ..
     "###########-###########"
  
-+-- Patch (tuner zstudy, 2026-11-22): --data-random-pct keeps that share of each 11-digit group random ('#') and turns the
++-- Patch (sysbench-compressible, Percona-Lab, 2026-11-22): --data-random-pct keeps that share of each 11-digit group random ('#') and turns the
 +-- rest of the group into fixed text. Positions are the same in every row, so lz4/zstd find long repeats across rows.
 +local FILL = "the quick brown fox jumps over the lazy dog while the cat sleeps on a warm mat by the open door of the old house "
 +local function shape(tpl)
