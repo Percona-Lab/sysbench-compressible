@@ -61,7 +61,7 @@ Measure your own data with `tools/pagecomp.py <name> /var/lib/mysql/<schema>` (n
 ## Background
 
 Built for a study of zram and zswap with an InnoDB buffer pool larger than RAM, where stock sysbench and HammerDB data
-compressed too little to test the idea: <https://github.com/Percona-Lab/db-ai-tuner/tree/main/docs/research/zstudy>.
+compressed too little to test the idea: <https://github.com/Percona-Lab/zram-zswap-db-benchmark>.
 
 ## License and disclosure
 
