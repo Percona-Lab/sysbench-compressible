@@ -1,0 +1,90 @@
+--- a/src/lua/oltp_common.lua
++++ b/src/lua/oltp_common.lua
+@@ -68,6 +68,10 @@
+       {"Create a secondary index in addition to the PRIMARY KEY", true},
+    mysql_storage_engine =
+       {"Storage engine, if MySQL is used", "innodb"},
++   data_random_pct =
++      {"Percent of the c and pad characters that are random digits (patched option, default 100 = stock sysbench). " ..
++          "The other characters are fixed text, the same in every row, so lower values make pages more compressible",
++       100},
+    pgsql_variant =
+       {"Use this PostgreSQL variant when running with the " ..
+           "PostgreSQL driver. The only currently supported " ..
+@@ -130,21 +134,52 @@
+ -- Template strings of random digits with 11-digit groups separated by dashes
+ 
+ -- 10 groups, 119 characters
+-local c_value_template = "###########-###########-###########-" ..
++local c_value_template_full = "###########-###########-###########-" ..
+    "###########-###########-###########-" ..
+    "###########-###########-###########-" ..
+    "###########"
+ 
+ -- 5 groups, 59 characters
+-local pad_value_template = "###########-###########-###########-" ..
++local pad_value_template_full = "###########-###########-###########-" ..
+    "###########-###########"
+ 
++-- Patch (tuner zstudy, 2026-11-22): --data-random-pct keeps that share of each 11-digit group random ('#') and turns the
++-- rest of the group into fixed text. Positions are the same in every row, so lz4/zstd find long repeats across rows.
++local FILL = "the quick brown fox jumps over the lazy dog while the cat sleeps on a warm mat by the open door of the old house "
++local function shape(tpl)
++   local pct = tonumber(sysbench.opt.data_random_pct) or 100
++   if pct >= 100 then return tpl end
++   local keep = math.floor(11 * pct / 100 + 0.5)
++   local out, g, pos = {}, 0, 0
++   for i = 1, #tpl do
++      local ch = tpl:sub(i, i)
++      if ch == "#" then
++         pos = pos + 1
++         if pos <= keep then out[#out + 1] = "#" else out[#out + 1] = FILL:sub((i - 1) % #FILL + 1, (i - 1) % #FILL + 1) end
++      else
++         pos = 0
++         out[#out + 1] = ch
++      end
++   end
++   return table.concat(out)
++end
++-- templates are built on first use: options are parsed after this file is loaded
++local c_tpl, pad_tpl
++function c_value_template_get()
++   if not c_tpl then c_tpl = shape(c_value_template_full) end
++   return c_tpl
++end
++function pad_value_template_get()
++   if not pad_tpl then pad_tpl = shape(pad_value_template_full) end
++   return pad_tpl
++end
++
+ function get_c_value()
+-   return sysbench.rand.string(c_value_template)
++   return sysbench.rand.string(c_value_template_get())
+ end
+ 
+ function get_pad_value()
+-   return sysbench.rand.string(pad_value_template)
++   return sysbench.rand.string(pad_value_template_get())
+ end
+ 
+ function create_table(drv, con, table_num)
+@@ -463,7 +498,7 @@
+    local tnum = get_table_num()
+ 
+    for i = 1, sysbench.opt.non_index_updates do
+-      param[tnum].non_index_updates[1]:set_rand_str(c_value_template)
++      param[tnum].non_index_updates[1]:set_rand_str(c_value_template_get())
+       param[tnum].non_index_updates[2]:set(get_id())
+ 
+       stmt[tnum].non_index_updates:execute()
+@@ -481,8 +516,8 @@
+ 
+       param[tnum].inserts[1]:set(id)
+       param[tnum].inserts[2]:set(k)
+-      param[tnum].inserts[3]:set_rand_str(c_value_template)
+-      param[tnum].inserts[4]:set_rand_str(pad_value_template)
++      param[tnum].inserts[3]:set_rand_str(c_value_template_get())
++      param[tnum].inserts[4]:set_rand_str(pad_value_template_get())
+ 
+       stmt[tnum].deletes:execute()
+       stmt[tnum].inserts:execute()
